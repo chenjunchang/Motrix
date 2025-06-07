@@ -25,6 +25,11 @@ export default new Router({
           props: true
         },
         {
+          path: '/rwy-alliance',
+          name: 'rwy-alliance',
+          component: require('@/components/RwyAlliance/Index').default
+        },
+        {
           path: '/preference',
           name: 'preference',
           component: require('@/components/Preference/Index').default,

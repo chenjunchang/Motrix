@@ -29,7 +29,9 @@ const state = {
   addTaskUrl: '',
   addTaskTorrents: [],
   addTaskOptions: {},
-  progress: 0
+  progress: 0,
+  capturedRequests: [],
+  capturedResponses: []
 }
 
 const getters = {
@@ -96,6 +98,24 @@ const mutations = {
   },
   UPDATE_PROGRESS (state, progress) {
     state.progress = progress
+  },
+  ADD_CAPTURED_REQUEST (state, requestData) {
+    state.capturedRequests.push(requestData)
+    // 保持最多1000条记录，防止内存溢出
+    if (state.capturedRequests.length > 1000) {
+      state.capturedRequests.shift()
+    }
+  },
+  ADD_CAPTURED_RESPONSE (state, responseData) {
+    state.capturedResponses.push(responseData)
+    // 保持最多1000条记录，防止内存溢出
+    if (state.capturedResponses.length > 1000) {
+      state.capturedResponses.shift()
+    }
+  },
+  CLEAR_CAPTURED_DATA (state) {
+    state.capturedRequests = []
+    state.capturedResponses = []
   }
 }
 
@@ -198,6 +218,15 @@ const actions = {
         }
         commit('UPDATE_PROGRESS', progress)
       })
+  },
+  addCapturedRequest ({ commit }, requestData) {
+    commit('ADD_CAPTURED_REQUEST', requestData)
+  },
+  addCapturedResponse ({ commit }, responseData) {
+    commit('ADD_CAPTURED_RESPONSE', responseData)
+  },
+  clearCapturedData ({ commit }) {
+    commit('CLEAR_CAPTURED_DATA')
   }
 }
 

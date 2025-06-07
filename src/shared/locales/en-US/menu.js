@@ -4,5 +4,6 @@ export default {
   'task': 'Task',
   'edit': 'Edit',
   'window': 'Window',
-  'help': 'Help'
+  'help': 'Help',
+  'rwyAlliance': 'RWY Alliance'
 }
