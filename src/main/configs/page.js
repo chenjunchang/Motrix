@@ -12,6 +12,6 @@ export default {
     },
     bindCloseToHide: true,
     openDevTools: is.dev(),
-    url: is.dev() ? 'http://localhost:9080' : require('path').join('file://', __dirname, '/index.html')
+    url: is.dev() ? 'http://localhost:9080' : `file://${require('path').join(__dirname, 'index.html')}`
   }
 }

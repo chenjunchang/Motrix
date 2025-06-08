@@ -99,7 +99,8 @@ export default class WindowManager extends EventEmitter {
       webPreferences: {
         contextIsolation: false,
         nodeIntegration: true,
-        nodeIntegrationInWorker: true
+        nodeIntegrationInWorker: true,
+        webSecurity: false
       }
     })
 
@@ -111,6 +112,19 @@ export default class WindowManager extends EventEmitter {
     if (is.dev() && pageOptions.openDevTools) {
       window.webContents.openDevTools()
     }
+
+    // 添加错误处理和调试
+    window.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+      logger.error('[Motrix] Failed to load page:', errorCode, errorDescription, validatedURL)
+    })
+
+    window.webContents.on('dom-ready', () => {
+      logger.info('[Motrix] DOM ready for page:', page)
+    })
+
+    window.webContents.on('did-finish-load', () => {
+      logger.info('[Motrix] Page finished loading:', page)
+    })
 
     window.webContents.setWindowOpenHandler(({ url }) => {
       shell.openExternal(url)

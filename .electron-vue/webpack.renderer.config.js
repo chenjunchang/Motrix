@@ -212,7 +212,8 @@ if (!devMode) {
       }]
     }),
     new Webpack.DefinePlugin({
-      'process.env.NODE_ENV': '"production"'
+      'process.env.NODE_ENV': '"production"',
+      '__static': `"${path.join(__dirname, '../dist/electron/static').replace(/\\/g, '\\\\')}"`
     }),
     new Webpack.LoaderOptionsPlugin({
       minimize: false
