@@ -1,5 +1,7 @@
 import puppeteer from 'puppeteer'
 import { EventEmitter } from 'events'
+import path from 'path'
+import { app } from 'electron'
 
 export class PuppeteerBrowser extends EventEmitter {
   constructor (options = {}) {
@@ -11,19 +13,129 @@ export class PuppeteerBrowser extends EventEmitter {
     this.interceptedData = []
   }
 
+  getChromePath () {
+    const fs = require('fs')
+
+    // 在开发环境中，使用bundled chrome
+    if (process.env.NODE_ENV === 'development') {
+      return null // 让puppeteer自动查找
+    }
+
+    console.log('[Puppeteer] 检查打包环境Chrome路径...')
+
+    // 在打包环境中，尝试多种路径
+    const appPath = app.getAppPath()
+    const resourcesPath = process.resourcesPath
+
+    console.log('[Puppeteer] App路径:', appPath)
+    console.log('[Puppeteer] Resources路径:', resourcesPath)
+
+    // 优先查找打包后的Chrome和用户缓存中的Chrome
+    const os = require('os')
+    const chromiumBasePaths = [
+      // 打包后的路径
+      path.join(resourcesPath, 'app.asar.unpacked', 'node_modules', 'puppeteer', '.local-chromium'),
+      path.join(appPath, 'node_modules', 'puppeteer', '.local-chromium'),
+      // 用户缓存中的Chrome路径
+      path.join(os.homedir(), '.cache', 'puppeteer', 'chrome')
+    ]
+
+    for (const basePath of chromiumBasePaths) {
+      console.log('[Puppeteer] 检查路径:', basePath)
+      if (fs.existsSync(basePath)) {
+        console.log('[Puppeteer] 找到.local-chromium目录:', basePath)
+
+        try {
+          // 读取目录内容，查找版本目录
+          const entries = fs.readdirSync(basePath)
+          console.log('[Puppeteer] 目录内容:', entries)
+
+          let platformPrefix, chromeSubPaths
+          if (process.platform === 'win32') {
+            platformPrefix = 'win64-'
+            chromeSubPaths = [
+              path.join('chrome-win64', 'chrome.exe'), // 新版本路径
+              path.join('chrome-win', 'chrome.exe') // 旧版本路径
+            ]
+          } else if (process.platform === 'darwin') {
+            platformPrefix = 'mac-'
+            chromeSubPaths = [
+              path.join('chrome-mac', 'Chromium.app', 'Contents', 'MacOS', 'Chromium')
+            ]
+          } else {
+            platformPrefix = 'linux-'
+            chromeSubPaths = [
+              path.join('chrome-linux', 'chrome')
+            ]
+          }
+
+          for (const entry of entries) {
+            if (entry.startsWith(platformPrefix)) {
+              for (const chromeSubPath of chromeSubPaths) {
+                const chromePath = path.join(basePath, entry, chromeSubPath)
+                console.log('[Puppeteer] 检查Chrome路径:', chromePath)
+                if (fs.existsSync(chromePath)) {
+                  console.log('[Puppeteer] 找到Chrome可执行文件:', chromePath)
+                  return chromePath
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.log('[Puppeteer] 读取目录出错:', error.message)
+        }
+      }
+    }
+
+    // 如果找不到打包的Chrome，尝试系统Chrome
+    const systemPaths = []
+    if (process.platform === 'win32') {
+      systemPaths.push(
+        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'
+      )
+    } else if (process.platform === 'darwin') {
+      systemPaths.push('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
+    } else {
+      systemPaths.push(
+        '/usr/bin/google-chrome-stable',
+        '/usr/bin/google-chrome',
+        '/usr/bin/chromium-browser'
+      )
+    }
+
+    for (const chromePath of systemPaths) {
+      if (fs.existsSync(chromePath)) {
+        console.log('[Puppeteer] 找到系统Chrome:', chromePath)
+        return chromePath
+      }
+    }
+
+    console.log('[Puppeteer] 未找到Chrome，使用系统默认')
+    return null
+  }
+
   async start () {
     try {
       console.log('[Puppeteer] 启动浏览器...')
 
+      // 获取Chrome执行路径
+      const chromePath = this.getChromePath()
+      console.log('[Puppeteer] Chrome路径:', chromePath)
+
       // 启动Puppeteer浏览器
       this.browser = await puppeteer.launch({
         headless: false, // 显示浏览器窗口，便于用户操作
+        executablePath: chromePath, // 指定Chrome可执行文件路径
         defaultViewport: { width: 1200, height: 800 },
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
           '--disable-web-security',
-          '--disable-features=VizDisplayCompositor'
+          '--disable-features=VizDisplayCompositor',
+          '--disable-dev-shm-usage',
+          '--no-first-run',
+          '--disable-gpu-sandbox'
         ]
       })
 

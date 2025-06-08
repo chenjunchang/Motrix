@@ -16,7 +16,11 @@
       "output": "release"
     },
     "files": [
-      "dist/electron/**/*"
+      "dist/electron/**/*",
+      "node_modules/puppeteer/.local-chromium/**/*"
+    ],
+    "asarUnpack": [
+      "node_modules/puppeteer/.local-chromium/**/*"
     ],
     "protocols": [
       {
