@@ -35,11 +35,14 @@ import TouchBarManager from './ui/TouchBarManager'
 import TrayManager from './ui/TrayManager'
 import DockManager from './ui/DockManager'
 import ThemeManager from './ui/ThemeManager'
+import PuppeteerBrowser from './modules/PuppeteerBrowser.js'
 
 export default class Application extends EventEmitter {
   constructor () {
     super()
     this.isReady = false
+    this.rwyBrowser = null
+    this.rwyEventEmitter = new EventEmitter()
     this.init()
   }
 
@@ -86,7 +89,24 @@ export default class Application extends EventEmitter {
 
     this.handleIpcInvokes()
 
+    this.setupRwyEventHandlers()
+
     this.emit('application:initialized')
+  }
+
+  setupRwyEventHandlers () {
+    // API拦截事件处理
+    this.rwyEventEmitter.on('api-intercepted', (data) => {
+      console.log('[主进程] 收到API拦截数据:', data.url)
+
+      // 发送给渲染进程
+      if (this.windowManager && this.windowManager.getWindow('index')) {
+        const mainWindow = this.windowManager.getWindow('index')
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('rwy-api-intercepted', data)
+        }
+      }
+    })
   }
 
   initContext () {
@@ -585,6 +605,11 @@ export default class Application extends EventEmitter {
         this.trayManager.destroy()
       ]
 
+      // 清理代理服务器
+      if (this.rwyProxyServer) {
+        promises.push(this.rwyProxyServer.stop())
+      }
+
       return promises
     } catch (err) {
       logger.warn('[Motrix] stop error: ', err.message)
@@ -1005,6 +1030,137 @@ export default class Application extends EventEmitter {
     ipcMain.on('event', (event, eventName, ...args) => {
       logger.log('[Motrix] ipc receive event', eventName, ...args)
       this.emit(eventName, ...args)
+    })
+
+    // RWY Puppeteer浏览器控制
+    ipcMain.on('start-rwy-proxy', async (event, options = {}) => {
+      try {
+        if (!this.rwyBrowser) {
+          this.rwyBrowser = new PuppeteerBrowser({
+            targetUrl: options.targetUrl || 'https://rwy.ywwl.com/lm/#/login'
+          })
+
+          // 监听API拦截事件
+          this.rwyBrowser.on('api-intercepted', (data) => {
+            this.rwyEventEmitter.emit('api-intercepted', data)
+          })
+        }
+
+        if (this.rwyBrowser.isRunning) {
+          event.reply('start-rwy-proxyed', {
+            success: true,
+            message: '浏览器已在运行',
+            url: await this.rwyBrowser.getCurrentUrl()
+          })
+          return
+        }
+
+        const result = await this.rwyBrowser.start()
+        event.reply('start-rwy-proxyed', {
+          success: true,
+          message: '浏览器启动成功',
+          url: result.url
+        })
+      } catch (error) {
+        console.error('[主进程] 启动浏览器失败:', error)
+        event.reply('start-rwy-proxyed', {
+          success: false,
+          error: error.message
+        })
+      }
+    })
+
+    ipcMain.on('stop-rwy-proxy', async (event) => {
+      try {
+        if (this.rwyBrowser) {
+          await this.rwyBrowser.stop()
+          this.rwyBrowser = null
+        }
+        event.reply('stop-rwy-proxyed', {
+          success: true,
+          message: '浏览器已关闭'
+        })
+      } catch (error) {
+        console.error('[主进程] 关闭浏览器失败:', error)
+        event.reply('stop-rwy-proxyed', {
+          success: false,
+          error: error.message
+        })
+      }
+    })
+
+    ipcMain.on('get-rwy-proxy-status', async (event) => {
+      try {
+        if (this.rwyBrowser) {
+          const status = this.rwyBrowser.getStatus()
+          event.reply('get-rwy-proxy-statused', {
+            isRunning: status.isRunning,
+            url: status.pageUrl || status.url,
+            interceptedCount: status.interceptedCount
+          })
+        } else {
+          event.reply('get-rwy-proxy-statused', {
+            isRunning: false,
+            url: null,
+            interceptedCount: 0
+          })
+        }
+      } catch (error) {
+        console.error('[主进程] 获取浏览器状态失败:', error)
+        event.reply('get-rwy-proxy-statused', {
+          isRunning: false,
+          url: null,
+          interceptedCount: 0,
+          error: error.message
+        })
+      }
+    })
+
+    // 获取拦截的数据
+    ipcMain.on('get-rwy-intercepted-data', (event) => {
+      try {
+        if (this.rwyBrowser) {
+          const data = this.rwyBrowser.getInterceptedData()
+          event.reply('get-rwy-intercepted-dataed', {
+            success: true,
+            data
+          })
+        } else {
+          event.reply('get-rwy-intercepted-dataed', {
+            success: false,
+            data: [],
+            error: '浏览器未启动'
+          })
+        }
+      } catch (error) {
+        console.error('[主进程] 获取拦截数据失败:', error)
+        event.reply('get-rwy-intercepted-dataed', {
+          success: false,
+          data: [],
+          error: error.message
+        })
+      }
+    })
+
+    // 清空拦截的数据
+    ipcMain.on('clear-rwy-intercepted-data', (event) => {
+      try {
+        if (this.rwyBrowser) {
+          const result = this.rwyBrowser.clearInterceptedData()
+          event.reply('clear-rwy-intercepted-dataed', result)
+        } else {
+          event.reply('clear-rwy-intercepted-dataed', {
+            success: false,
+            error: '浏览器未启动'
+          })
+        }
+      } catch (error) {
+        console.error('[主进程] 清空拦截数据失败:', error)
+        event.reply('clear-rwy-intercepted-dataed', {
+          success: false,
+          error: error.message
+        })
+      }
     })
   }
 

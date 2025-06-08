@@ -31,7 +31,17 @@ const state = {
   addTaskOptions: {},
   progress: 0,
   capturedRequests: [],
-  capturedResponses: []
+  capturedResponses: [],
+
+  // 新增RWY代理相关状态
+  rwyProxyStatus: 'stopped', // stopped, starting, running, stopping, error
+  rwyProxyPort: null,
+  rwyProxyUrl: '',
+
+  // 新增下载抽屉状态
+  downloadDrawerVisible: false,
+  downloadFileList: [],
+  selectedFileIds: []
 }
 
 const getters = {
@@ -116,6 +126,28 @@ const mutations = {
   CLEAR_CAPTURED_DATA (state) {
     state.capturedRequests = []
     state.capturedResponses = []
+  },
+
+  // RWY代理状态
+  UPDATE_RWY_PROXY_STATUS (state, { status, port, proxyUrl }) {
+    state.rwyProxyStatus = status
+    state.rwyProxyPort = port
+    state.rwyProxyUrl = proxyUrl || ''
+  },
+
+  // 下载抽屉相关
+  TOGGLE_DOWNLOAD_DRAWER (state, visible) {
+    state.downloadDrawerVisible = visible
+  },
+  UPDATE_DOWNLOAD_FILE_LIST (state, fileList) {
+    state.downloadFileList = fileList
+  },
+  UPDATE_SELECTED_FILE_IDS (state, ids) {
+    state.selectedFileIds = ids
+  },
+  CLEAR_DOWNLOAD_FILE_LIST (state) {
+    state.downloadFileList = []
+    state.selectedFileIds = []
   }
 }
 
@@ -227,6 +259,25 @@ const actions = {
   },
   clearCapturedData ({ commit }) {
     commit('CLEAR_CAPTURED_DATA')
+  },
+
+  // RWY代理控制
+  updateRwyProxyStatus ({ commit }, statusData) {
+    commit('UPDATE_RWY_PROXY_STATUS', statusData)
+  },
+
+  // 下载抽屉控制
+  toggleDownloadDrawer ({ commit }, visible) {
+    commit('TOGGLE_DOWNLOAD_DRAWER', visible)
+  },
+  updateDownloadFileList ({ commit }, fileList) {
+    commit('UPDATE_DOWNLOAD_FILE_LIST', fileList)
+  },
+  updateSelectedFileIds ({ commit }, ids) {
+    commit('UPDATE_SELECTED_FILE_IDS', ids)
+  },
+  clearDownloadFileList ({ commit }) {
+    commit('CLEAR_DOWNLOAD_FILE_LIST')
   }
 }
 
